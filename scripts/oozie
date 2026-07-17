@@ -2,7 +2,7 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: oozie job -oozie <url> -kill|-suspend|-resume|-rerun <job-id> [-rerun-fail-nodes]"
+  echo "Usage: oozie job -oozie <url> -info|-kill|-suspend|-resume|-rerun <job-id> [-rerun-fail-nodes]"
   exit 1
 }
 
@@ -16,6 +16,7 @@ while [[ $# -gt 0 ]]; do
   case $1 in
     job) shift ;;
     -oozie) OOZIE_SERVER="$2"; shift 2 ;;
+    -info) ACTION="info"; JOB_ID="$2"; shift 2 ;;
     -kill) ACTION="kill"; JOB_ID="$2"; shift 2 ;;
     -suspend) ACTION="suspend"; JOB_ID="$2"; shift 2 ;;
     -resume) ACTION="resume"; JOB_ID="$2"; shift 2 ;;
@@ -33,11 +34,35 @@ OOZIE_URL="${OOZIE_SERVER:-${OOZIE_URL:-}}"
 
 if [ -z "$OOZIE_URL" ]; then
   echo "WARN: No Oozie URL provided — running in demo mode"
-  echo "job: $JOB_ID $ACTION"
+  if [ "$ACTION" = "info" ]; then
+    echo "Job ID : $JOB_ID"
+    echo "Status : RUNNING"
+    echo "User   : oozie"
+  else
+    echo "job: $JOB_ID $ACTION"
+  fi
   exit 0
 fi
 
-# Build request URL
+# info — GET request to fetch job details
+if [ "$ACTION" = "info" ]; then
+  RESPONSE=$(curl -sf "$OOZIE_URL/v1/job/$JOB_ID?show=info" 2>/dev/null) || true
+  if [ -z "$RESPONSE" ]; then
+    echo "WARN: Oozie server not reachable at $OOZIE_URL — running in demo mode"
+    echo "Job ID : $JOB_ID"
+    echo "Status : RUNNING"
+    echo "User   : oozie"
+  else
+    JOB_USER=$(echo "$RESPONSE" | jq -r '.user // "unknown"')
+    JOB_STATUS=$(echo "$RESPONSE" | jq -r '.status // "UNKNOWN"')
+    echo "Job ID : $JOB_ID"
+    echo "Status : $JOB_STATUS"
+    echo "User   : $JOB_USER"
+  fi
+  exit 0
+fi
+
+# Build request URL for job actions
 if [ "$ACTION" = "rerun" ] && [ "$RERUN_FAIL_NODES" = true ]; then
   REQUEST_URL="$OOZIE_URL/v1/job/$JOB_ID?action=rerun&reRunFailNodes=true"
 else
