@@ -1,0 +1,63 @@
+#!/bin/bash
+set -euo pipefail
+
+usage() {
+  echo "Usage: oozie job -oozie <url> -kill|-suspend|-resume|-rerun <job-id> [-rerun-fail-nodes]"
+  exit 1
+}
+
+OOZIE_SERVER=""
+ACTION=""
+JOB_ID=""
+RERUN_FAIL_NODES=false
+
+# Parse arguments - same interface as real Oozie CLI
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    job) shift ;;
+    -oozie) OOZIE_SERVER="$2"; shift 2 ;;
+    -kill) ACTION="kill"; JOB_ID="$2"; shift 2 ;;
+    -suspend) ACTION="suspend"; JOB_ID="$2"; shift 2 ;;
+    -resume) ACTION="resume"; JOB_ID="$2"; shift 2 ;;
+    -rerun) ACTION="rerun"; JOB_ID="$2"; shift 2 ;;
+    -rerun-fail-nodes) RERUN_FAIL_NODES=true; shift ;;
+    *) shift ;;
+  esac
+done
+
+if [ -z "$JOB_ID" ] || [ -z "$ACTION" ]; then
+  usage
+fi
+
+OOZIE_URL="${OOZIE_SERVER:-${OOZIE_URL:-}}"
+
+if [ -z "$OOZIE_URL" ]; then
+  echo "WARN: No Oozie URL provided — running in demo mode"
+  echo "job: $JOB_ID $ACTION"
+  exit 0
+fi
+
+# Build request URL
+if [ "$ACTION" = "rerun" ] && [ "$RERUN_FAIL_NODES" = true ]; then
+  REQUEST_URL="$OOZIE_URL/v1/job/$JOB_ID?action=rerun&reRunFailNodes=true"
+else
+  REQUEST_URL="$OOZIE_URL/v1/job/$JOB_ID?action=$ACTION"
+fi
+
+# Attempt real API call
+HTTP_CODE=$(curl -s -o /tmp/oozie_response.json -w "%{http_code}" \
+  -X PUT \
+  -H "Content-Type: application/json" \
+  "$REQUEST_URL" 2>/dev/null) || true
+
+if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "204" ]; then
+  echo "job: $JOB_ID $ACTION"
+  cat /tmp/oozie_response.json 2>/dev/null || true
+elif [ -z "$HTTP_CODE" ] || [ "$HTTP_CODE" = "000" ]; then
+  echo "WARN: Oozie server not reachable at $OOZIE_URL — running in demo mode"
+  echo "job: $JOB_ID $ACTION"
+else
+  echo "ERROR: Oozie server returned HTTP $HTTP_CODE"
+  cat /tmp/oozie_response.json 2>/dev/null || true
+  exit 1
+fi
