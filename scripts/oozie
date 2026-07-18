@@ -1,9 +1,35 @@
 #!/bin/bash
 set -euo pipefail
 
+JOBS_FILE="/etc/oozie/oozie-jobs.json"
+
 usage() {
   echo "Usage: oozie job -oozie <url> -info|-kill|-suspend|-resume|-rerun <job-id> [-rerun-fail-nodes]"
   exit 1
+}
+
+demo_info() {
+  local job_id="$1"
+  if [ -f "$JOBS_FILE" ]; then
+    JOB_ENTRY=$(jq -r --arg id "$job_id" '.[] | select(.job_id == $id)' "$JOBS_FILE")
+    if [ -n "$JOB_ENTRY" ]; then
+      JOB_USER=$(echo "$JOB_ENTRY" | jq -r '.user')
+      JOB_STATUS=$(echo "$JOB_ENTRY" | jq -r '.status')
+      JOB_NAME=$(echo "$JOB_ENTRY" | jq -r '.name')
+    else
+      JOB_USER="oozie"
+      JOB_STATUS="RUNNING"
+      JOB_NAME="unknown"
+    fi
+  else
+    JOB_USER="oozie"
+    JOB_STATUS="RUNNING"
+    JOB_NAME="unknown"
+  fi
+  echo "Job ID : $job_id"
+  echo "Name   : $JOB_NAME"
+  echo "Status : $JOB_STATUS"
+  echo "User   : $JOB_USER"
 }
 
 OOZIE_SERVER=""
@@ -35,9 +61,7 @@ OOZIE_URL="${OOZIE_SERVER:-${OOZIE_URL:-}}"
 if [ -z "$OOZIE_URL" ]; then
   echo "WARN: No Oozie URL provided — running in demo mode"
   if [ "$ACTION" = "info" ]; then
-    echo "Job ID : $JOB_ID"
-    echo "Status : RUNNING"
-    echo "User   : oozie"
+    demo_info "$JOB_ID"
   else
     echo "job: $JOB_ID $ACTION"
   fi
@@ -49,13 +73,13 @@ if [ "$ACTION" = "info" ]; then
   RESPONSE=$(curl -sf "$OOZIE_URL/v1/job/$JOB_ID?show=info" 2>/dev/null) || true
   if [ -z "$RESPONSE" ]; then
     echo "WARN: Oozie server not reachable at $OOZIE_URL — running in demo mode"
-    echo "Job ID : $JOB_ID"
-    echo "Status : RUNNING"
-    echo "User   : oozie"
+    demo_info "$JOB_ID"
   else
     JOB_USER=$(echo "$RESPONSE" | jq -r '.user // "unknown"')
     JOB_STATUS=$(echo "$RESPONSE" | jq -r '.status // "UNKNOWN"')
+    JOB_NAME=$(echo "$RESPONSE" | jq -r '.appName // "unknown"')
     echo "Job ID : $JOB_ID"
+    echo "Name   : $JOB_NAME"
     echo "Status : $JOB_STATUS"
     echo "User   : $JOB_USER"
   fi
