@@ -1,0 +1,32 @@
+[
+  {
+    "job_id": "0000001-240101120000000-oozie-oozi-W",
+    "name": "daily_etl_pipeline",
+    "user": "oozie",
+    "status": "RUNNING"
+  },
+  {
+    "job_id": "0000002-240101120000000-oozie-oozi-W",
+    "name": "data_ingestion_workflow",
+    "user": "cicd_service_user1",
+    "status": "RUNNING"
+  },
+  {
+    "job_id": "0000003-240101120000000-oozie-oozi-C",
+    "name": "weekly_report_coordinator",
+    "user": "oozie",
+    "status": "SUSPENDED"
+  },
+  {
+    "job_id": "0000004-240101120000000-oozie-oozi-C",
+    "name": "spark_ingestion_coordinator",
+    "user": "cicd_service_user1",
+    "status": "RUNNING"
+  },
+  {
+    "job_id": "0000005-240101120000000-oozie-oozi-B",
+    "name": "monthly_reconciliation_bundle",
+    "user": "oozie",
+    "status": "RUNNING"
+  }
+]
